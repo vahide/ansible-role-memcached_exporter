@@ -1,0 +1,44 @@
+---
+#- hosts: all
+#  any_errors_fatal: true
+#  roles:
+#    - ansible-memcached_exporter
+#  vars: []
+
+- name: Run role
+  hosts: all
+  any_errors_fatal: true
+  roles:
+    - ansible-memcached-exporter
+  pre_tasks:
+    - name: Create memcached_exporter cert dir
+      file:
+        path: "{{ memcached_exporter_tls_server_config.cert_file | dirname }}"
+        state: directory
+        owner: root
+        group: root
+    - name: Copy cert and key
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+      with_items:
+        - src: "/tmp/tls.cert"
+          dest: "{{ memcached_exporter_tls_server_config.cert_file }}"
+        - src: "/tmp/tls.key"
+          dest: "{{ memcached_exporter_tls_server_config.key_file }}"
+  vars:
+    memcached_exporter_binary_local_dir: "/tmp/memcached_exporter-linux-amd64"
+    memcached_exporter_web_listen_address: "127.0.0.1:8080"
+    memcached_exporter_textfile_dir: ""
+    memcached_exporter_enabled_collectors:
+      - entropy
+    memcached_exporter_disabled_collectors:
+      - diskstats
+
+    memcached_exporter_tls_server_config:
+      cert_file: /etc/memcached_exporter/tls.cert
+      key_file: /etc/memcached_exporter/tls.key
+    memcached_exporter_http_server_config:
+      http2: true
+    memcached_exporter_basic_auth_users:
+      randomuser: examplepassword

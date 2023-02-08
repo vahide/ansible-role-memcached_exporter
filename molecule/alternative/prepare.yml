@@ -1,0 +1,61 @@
+---
+#- name: Prepare
+#  hosts: all
+#  gather_facts: false
+#  tasks: []
+- name: Prepare
+  hosts: localhost
+  gather_facts: false
+  vars:
+    go_arch: amd64
+    memcached_exporter_version: 0.7.0
+  tasks:
+    - name: Download memcached_exporter binary to local folder
+      become: false
+      get_url:
+        url: "https://github.com/prometheus/memcached_exporter/releases/download/v{{ memcached_exporter_version }}/memcached_exporter-{{ memcached_exporter_version }}.linux-{{ go_arch }}.tar.gz"
+        dest: "/tmp/memcached_exporter-{{ memcached_exporter_version }}.linux-{{ go_arch }}.tar.gz"
+      register: _download_binary
+      until: _download_binary is succeeded
+      retries: 5
+      delay: 2
+      run_once: true
+      check_mode: false
+
+    - name: Unpack memcached_exporter binary
+      become: false
+      unarchive:
+        src: "/tmp/memcached_exporter-{{ memcached_exporter_version }}.linux-{{ go_arch }}.tar.gz"
+        dest: "/tmp"
+        creates: "/tmp/memcached_exporter-{{ memcached_exporter_version }}.linux-{{ go_arch }}/memcached_exporter"
+      run_once: true
+      check_mode: false
+
+    - name: link to memcached_exporter binaries directory
+      become: false
+      file:
+        src: "/tmp/memcached_exporter-{{ memcached_exporter_version }}.linux-amd64"
+        dest: "/tmp/memcached_exporter-linux-amd64"
+        state: link
+      run_once: true
+      check_mode: false
+
+    - name: install pyOpenSSL for certificate generation
+      pip:
+        name: "pyOpenSSL"
+
+    - name: Create private key
+      openssl_privatekey:
+        path: "/tmp/tls.key"
+
+    - name: Create CSR
+      openssl_csr:
+        path: "/tmp/tls.csr"
+        privatekey_path: "/tmp/tls.key"
+
+    - name: Create certificate
+      openssl_certificate:
+        path: "/tmp/tls.cert"
+        csr_path: "/tmp/tls.csr"
+        privatekey_path: "/tmp/tls.key"
+        provider: selfsigned

@@ -1,0 +1,23 @@
+---
+
+memcached_exporter_version: 0.7.0
+memcached_exporter_binary_local_dir: ""
+memcached_exporter_web_listen_address: "0.0.0.0:9150"
+
+memcached_exporter_textfile_dir: "/var/lib/memcached_exporter"
+
+memcached_exporter_tls_server_config: {}
+
+memcached_exporter_http_server_config: {}
+
+memcached_exporter_basic_auth_users: {}
+
+memcached_exporter_enabled_collectors:
+# - systemd
+  - textfile:
+      directory: "{{ memcached_exporter_textfile_dir }}"
+#  - filesystem:
+#      ignored-mount-points: "^/(sys|proc|dev)($|/)"
+#      ignored-fs-types: "^(sys|proc|auto)fs$"
+
+memcached_exporter_disabled_collectors: []

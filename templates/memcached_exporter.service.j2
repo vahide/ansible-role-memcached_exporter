@@ -1,0 +1,22 @@
+{{ ansible_managed | comment }}
+
+[Unit]
+Description=memcached_exporter
+After=network-online.target
+StartLimitInterval=0
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ _memcached_exporter_system_user }}
+Group={{ _memcached_exporter_system_group }}
+ExecStart={{ _memcached_exporter_binary_install_dir }}/memcached_exporter --memcached.address={{ ansible_mgmt.ipv4.address }}:11211
+SyslogIdentifier=memcached_exporter
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+
+
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,111 @@
+---
+- name: Assert usage of systemd as an init system
+  assert:
+    that: ansible_service_mgr == 'systemd'
+    msg: "This module only works with systemd"
+
+- name: Get systemd version
+  command: systemctl --version
+  changed_when: false
+  check_mode: false
+  register: __systemd_version
+  tags:
+    - skip_ansible_lint
+
+- name: Set systemd version fact
+  set_fact:
+    memcached_exporter_systemd_version: "{{ __systemd_version.stdout_lines[0] | regex_replace('^systemd\\s(\\d+).*$', '\\1') }}"
+
+- name: Naive assertion of proper listen address
+  assert:
+    that:
+      - "':' in memcached_exporter_web_listen_address"
+
+- name: Assert collectors are not both disabled and enabled at the same time
+  assert:
+    that:
+      - "item not in memcached_exporter_enabled_collectors"
+  with_items: "{{ memcached_exporter_disabled_collectors }}"
+
+- block:
+    - name: Assert that TLS key and cert path are set
+      assert:
+        that:
+          - "memcached_exporter_tls_server_config.cert_file is defined"
+          - "memcached_exporter_tls_server_config.key_file is defined"
+
+    - name: Check existence of TLS cert file
+      stat:
+        path: "{{ memcached_exporter_tls_server_config.cert_file }}"
+      register: __memcached_exporter_cert_file
+
+    - name: Check existence of TLS key file
+      stat:
+        path: "{{ memcached_exporter_tls_server_config.key_file }}"
+      register: __memcached_exporter_key_file
+
+    - name: Assert that TLS key and cert are present
+      assert:
+        that:
+          - "{{ __memcached_exporter_cert_file.stat.exists }}"
+          - "{{ __memcached_exporter_key_file.stat.exists }}"
+  when: memcached_exporter_tls_server_config | length > 0
+
+- name: Check if memcached_exporter is installed
+  stat:
+    path: "{{ _memcached_exporter_binary_install_dir }}/memcached_exporter"
+  register: __memcached_exporter_is_installed
+  check_mode: false
+  tags:
+    - memcached_exporter_install
+
+      #- name: Gather currently installed memcached_exporter version (if any)
+      #command: "{{ _memcached_exporter_binary_install_dir }}/memcached_exporter --version"
+      #args:
+      # warn: false
+      #changed_when: false
+      #register: __memcached_exporter_current_version_output
+      #check_mode: false
+      #when: __memcached_exporter_is_installed.stat.exists
+      #tags:
+      #- memcached_exporter_install
+      # - skip_ansible_lint
+
+- block:
+    - name: Get latest release
+      uri:
+        url: "https://api.github.com/repos/prometheus/memcached_exporter/releases/latest"
+        method: GET
+        return_content: true
+        status_code: 200
+        body_format: json
+        user: "{{ lookup('env', 'GH_USER') | default(omit) }}"
+        password: "{{ lookup('env', 'GH_TOKEN') | default(omit) }}"
+      no_log: "{{ not lookup('env', 'MOLECULE_DEBUG') | bool }}"
+      register: _latest_release
+      until: _latest_release.status == 200
+      retries: 5
+
+    - name: "Set memcached_exporter version to {{ _latest_release.json.tag_name[1:] }}"
+      set_fact:
+        memcached_exporter_version: "{{ _latest_release.json.tag_name[1:] }}"
+  when:
+    - memcached_exporter_version == "latest"
+    - memcached_exporter_binary_local_dir | length == 0
+  delegate_to: localhost
+  run_once: true
+
+- block:
+    - name: Get checksum list from github
+      set_fact:
+        _checksums: "{{ lookup('url', 'https://github.com/prometheus/memcached_exporter/releases/download/v' + memcached_exporter_version + '/sha256sums.txt', wantlist=True) | list }}"
+      run_once: true
+
+    - name: "Get checksum for {{ go_arch }} architecture"
+      set_fact:
+        memcached_exporter_checksum: "{{ item.split(' ')[0] }}"
+      with_items: "{{ _checksums }}"
+      when:
+        - "('linux-' + go_arch + '.tar.gz') in item"
+  delegate_to: localhost
+  when: memcached_exporter_binary_local_dir | length == 0
