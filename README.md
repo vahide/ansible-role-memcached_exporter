@@ -14,7 +14,6 @@ All variables which can be overridden are stored in defaults/main.yml file.
 ---
 - name: memcached Exporter Install
   hosts: memcached
-  gather_facts: "{{ osa_gather_facts | default(True) }}"
   user: root
   roles:
     - ansible-role-memcached-exporter
