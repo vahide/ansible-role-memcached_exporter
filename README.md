@@ -10,6 +10,7 @@ All variables which can be overridden are stored in defaults/main.yml file.
 
 ## Example
 # Playbook
+```
 ---
 - name: memcached Exporter Install
   hosts: memcached
@@ -19,6 +20,7 @@ All variables which can be overridden are stored in defaults/main.yml file.
     - ansible-role-memcached-exporter
   tags:
     - prometheus_memcached_exporter
+```
 
 ## License
 
